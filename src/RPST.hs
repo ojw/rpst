@@ -1,11 +1,4 @@
-{-# LANGUAGE DeriveAnyClass         #-}
-{-# LANGUAGE FlexibleContexts       #-}
-{-# LANGUAGE FlexibleInstances      #-}
-{-# LANGUAGE FunctionalDependencies #-}
-{-# LANGUAGE MultiParamTypeClasses  #-}
-{-# LANGUAGE OverloadedStrings      #-}
-{-# LANGUAGE ScopedTypeVariables    #-}
-{-# LANGUAGE TemplateHaskell        #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 
 module RPST where
 
@@ -19,119 +12,7 @@ import           Data.Monoid            ((<>))
 import           Data.Text              (Text)
 import           Debug.Trace
 
-data Stats = Stats
-  { _statsHealth :: Int
-  , _statsEnergy :: Int
-  } deriving (Show)
-
-instance Monoid Stats where
-  mempty = Stats 0 0
-  (Stats a b) `mappend` (Stats x y) = (Stats (a+x) (b+y))
-
-instance Num Stats where
-  (Stats h e) + (Stats h' e') = Stats (h + h') (e + e')
-  (Stats h e) * (Stats h' e') = Stats (h * h') (e + e') -- but don't
-  abs (Stats h e) = Stats (abs h) (abs e)
-  signum (Stats h e) = Stats (signum h) (signum e)
-  fromInteger i = (Stats (fromInteger i) 0) --jeez
-  negate (Stats h e) = Stats (negate h) (negate e)
-
-newtype Cost = Cost Stats
-  deriving (Show)
-
-newtype Damage = Damage Stats
-  deriving (Show)
-
-instance Monoid Damage where
-  mempty = Damage (Stats 0 0)
-  Damage (Stats a b) `mappend` Damage (Stats x y) = Damage (Stats (a+x) (b+y))
-
-instance Num Damage where
-  (Damage s) + (Damage s') = Damage (s + s')
-  (Damage s) * (Damage s') = Damage (s * s')
-  abs (Damage d) = Damage (abs d)
-  signum (Damage d) = Damage (signum d)
-  fromInteger i = Damage (fromInteger i)
-  negate (Damage d) = Damage (negate d)
-
-data TargetType = TTSelf | TTFriend | TTFoe | TTAny
-  deriving (Show)
-
--- data Effect = Effect            -- jinkies
---   deriving (Show)
-
-data Effect = Effect (CharacterState -> CharacterState)
-
-instance Show Effect where
-  show e = "Effect"
-
-data Ability = Ability
-  { _abilityName       :: Text
-  , _abilityCost       :: Cost
-  , _abilityTargetType :: TargetType
-  , _abilityEffect     :: Effect
-  } deriving (Show)
-
-data Character = Character
-  { _characterName       :: Text
-  , _characterStats      :: Stats
-  , _characterAbilities  :: [Ability]
-  , _characterPointValue :: Int       -- assuming point value system later
-  } deriving (Show)
-
-data CharacterState = CharacterState -- I expect to eventually track damage differently... via a collection of effects with sources, durations, etc
-  { _characterStateCharacter :: Character
-  , _characterStateDamage    :: Damage
-  , _characterStateOwner     :: Player
-  } deriving (Show)
-
-data Player = FirstPlayer | SecondPlayer
-  deriving (Ord, Eq, Show)
-
-data Command = Command
-  { _commandCharacter :: Int -- for now...
-  , _commandAbility   :: Int -- yuck...
-  , _commandTarget    :: Int -- okay this is just a placeholder
-  } deriving Show -- jeez
-
-data Game = Game
-  { _gameCharacters :: (Map Int CharacterState) -- maybe?
-  } deriving Show
-
-type User = Text
-
-data Server = Server
-  { _serverGames :: TVar (Map Int (Map User Player, Game))
-  , _serverInput :: TChan Message
-  }
-
--- eh... need something to capture the fact that commands should be
--- sent for each of a player's characters Probably Map Id Order, where
--- Order is an improved Command?
---
--- Eh actually just [Command] is fine, w/ some checking that it's
--- exhaustive, or defaulting for missed characters.
-data Orders = Orders
-  { _orders :: [Command]
-  } deriving Show
-
-data Message = Message
-  { _messageUser    :: User
-  , _messageCommand :: Command
-  , _messageGame    :: Int
-  } deriving Show
-
-data Outcome = WinnerIs Player | MutualDeath | Ongoing
-  deriving Show
-
-makeFields ''Stats
-makeFields ''Character
-makeFields ''Ability
-makeFields ''CharacterState
-makeFields ''Command
-makeFields ''Game
-makeFields ''Server
-makeFields ''Message
+import           RPST.Types
 
 viewGame :: Int -> Server -> IO (Maybe Game)
 viewGame gid server = do
@@ -157,19 +38,32 @@ startGame players game server = atomically $ do
       gameMap' = Map.insert nextGameId (players, game) gameMap
   writeTVar (view games server) gameMap'
 
+commandContents :: Command -> Game -> Maybe (CharacterState, Ability, CharacterState)
+commandContents com gom = do
+  char <- Map.lookup (view character com) (view characters gom)
+  abil <- char ^? character . abilities . ix (view ability com)
+  targ <- Map.lookup (view target com) (view characters gom)
+  return (char, abil, targ)
+
+-- validateOrders :: Player -> Orders -> Game -> Bool
+-- validateOrders player ordrs game = all f (view orders ordrs)
+--   where f =
+
+
 -- what a mess
 validateMessage :: Server -> Message -> STM Bool
 validateMessage server message = do
-  let usr = view user message
-      cmd = view command message
-      gam = view game message
-  games <- readTVar (view games server)
-  let maybeSuccess = do
-        (playerMap, game) <- Map.lookup gam games
-        player <- Map.lookup usr playerMap
-        chr <- Map.lookup (view character cmd) (view characters game)
-        return ((view owner chr) == player)
-  return $ maybe False id maybeSuccess
+  return True
+  -- let usr = view user message
+  --     cmd = view command message
+  --     gam = view game message
+  -- games <- readTVar (view games server)
+  -- let maybeSuccess = do
+  --       (playerMap, game) <- Map.lookup gam games
+  --       player <- Map.lookup usr playerMap
+  --       chr <- Map.lookup (view character cmd) (view characters game)
+  --       return ((view owner chr) == player)
+  -- return $ maybe False id maybeSuccess
 
 -- uuuugh
 processMessage :: Server -> IO ()
@@ -177,17 +71,24 @@ processMessage server = atomically $ do
   message <- readTChan (view input server)
   gomes :: Map Int (Map User Player, Game) <- readTVar (view games server)
   isValid <- validateMessage server message
-  let gs' :: Maybe (Map Int (Map User Player, Game)) = do
-        (players, gm) <- Map.lookup (view game message) gomes
-        game' <- processCommand (view command message) gm
-        let games' :: Map Int (Map User Player, Game) = Map.insert (view game message) (players, game') gomes
-        return games'
   when isValid $
+    let gs' :: Maybe (Map Int (Map User Player, Game)) = do
+          (players, gm) <- Map.lookup (view game message) gomes
+          game' <- processMessagePayload (view user message) (view payload message) gm
+          let games' :: Map Int (Map User Player, Game) = Map.insert (view game message) (players, game') gomes
+          return games'
+    in
     maybe
       (return ())
       (\gs -> writeTVar (view games server) gs)
       gs'
 
+processMessagePayload :: User -> MessagePayload -> Game -> Maybe Game
+processMessagePayload user payload game =
+  case payload of
+    CharacterOrders orders -> Just game
+
+-- this needs way more intelligence around it
 processCommand :: Command -> Game -> Maybe Game
 processCommand command game = do
   char <- game ^? characters . ix (view character command) . character
@@ -203,7 +104,7 @@ isAlive :: CharacterState -> Bool
 isAlive char = maxHealth > healthDamage
   where
     maxHealth = view (character . stats . health) char
-    (Damage d) = view damage char -- ugh what was I thinking
+    d = view damage char -- ugh what was I thinking
     healthDamage = view health d
 
 outcome :: Game -> Outcome
@@ -228,20 +129,27 @@ new :: Character -> Player -> CharacterState
 new char player = CharacterState char mempty player
 
 applyDamage :: Damage -> Stats -> Stats
-applyDamage (Damage d) s = s - d
+applyDamage d s = s & health -~ (view health d)
+                    & energy -~ (view energy d)
 
 -- jeez which of these do I want?
 payCost :: Cost -> CharacterState -> CharacterState
-payCost (Cost c) = damage +~ (Damage c)
+payCost c cs = cs & damage .~ d'
+  where
+    d = view damage cs
+    d' = d & health +~ view health c
+           & energy +~ view energy c
 
 payFor :: Ability -> CharacterState -> CharacterState
 payFor ability = payCost (view cost ability)
 
 damageEff :: Damage -> Effect
-damageEff d = Effect (damage +~ d)
+damageEff d = Effect $ \h -> h & damage . health +~ view health d
+                               & damage . energy +~ view energy d
 
 healingEff :: Damage -> Effect
-healingEff h = Effect (damage -~ h)
+healingEff d = Effect $ \h -> h & damage . health -~ view health d
+                                & damage . energy -~ view energy d
 
 applyAbility :: Ability -> CharacterState -> CharacterState
 applyAbility ability = f
