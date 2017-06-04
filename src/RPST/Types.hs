@@ -3,14 +3,15 @@
 {-# LANGUAGE FlexibleInstances      #-}
 {-# LANGUAGE FunctionalDependencies #-}
 {-# LANGUAGE MultiParamTypeClasses  #-}
-{-# LANGUAGE OverloadedStrings      #-}
 {-# LANGUAGE ScopedTypeVariables    #-}
 {-# LANGUAGE TemplateHaskell        #-}
 
 module RPST.Types where
 
 import           Control.Concurrent.STM
+import           Control.Error
 import           Control.Lens
+import           Data.Default
 import           Data.Map               (Map)
 import qualified Data.Map               as Map
 import           Data.Text              (Text)
@@ -19,6 +20,9 @@ data Stats' a = Stats
   { _stats'Health :: Int
   , _stats'Energy :: Int
   } deriving (Show)
+
+coerceStats :: Stats' a -> Stats' b
+coerceStats (Stats x y) = Stats x y
 
 instance Monoid (Stats' a) where
   mempty = Stats 0 0
@@ -80,16 +84,31 @@ data Command = Command
   , _commandTarget    :: Int -- okay this is just a placeholder
   } deriving Show -- jeez
 
+type TimeDelta = Int
+
+data GameConfig = GameConfig
+  { _gameConfigTimePerTurn  :: Maybe Int
+  } deriving Show
+
+instance Default GameConfig where
+  def = GameConfig Nothing
+
 data Game = Game
   { _gameCharacters         :: (Map Int CharacterState) -- maybe?
-  , _gameFirstPlayerOrders  :: Orders
-  , _gameSecondPlayerOrders :: Orders
+  , _gameFirstPlayerOrders  :: Maybe Orders
+  , _gameSecondPlayerOrders :: Maybe Orders
+  , _gameConfig             :: GameConfig
+  , _gameTimer              :: Maybe Int -- is the game timed?
   } deriving Show
+
+-- Server-related types.
 
 type User = Text
 
+type GameId = Int
+
 data Server = Server
-  { _serverGames :: TVar (Map Int (Map User Player, Game))
+  { _serverGames :: TVar (Map GameId (Map User Player, Game))
   , _serverInput :: TChan Message
   }
 
@@ -115,6 +134,16 @@ data Message = Message
 data Outcome = WinnerIs Player | MutualDeath | Ongoing
   deriving Show
 
+data Error
+  = GameDoesNotExist
+  | UserIsNotInGame
+  | UserDoesNotControlCharacter
+  | CharacterIsNotInGame
+  | CharacterDoesNotHaveAbility
+
+-- gotta have soooomething here... not sure what yet
+type Foo = ExceptT Error STM
+
 makeFields ''Stats'
 makeFields ''Character
 makeFields ''Ability
@@ -124,3 +153,4 @@ makeFields ''Game
 makeFields ''Server
 makeFields ''Message
 makeFields ''Orders
+makeFields ''GameConfig
