@@ -16,6 +16,8 @@ import           Data.Text              (Text)
 import           RPST.Game
 import           RPST.Types
 
+-- | Creating games and servers
+
 viewGame :: Int -> Server -> IO (Maybe Game)
 viewGame gid server = do
   gomes <- readTVarIO $ view games server
@@ -40,6 +42,8 @@ startGame players game server = atomically $ do
       gameMap' = Map.insert nextGameId (players, game) gameMap
   writeTVar (view games server) gameMap'
 
+-- | Validating messages to the server
+
 validateMessage :: Server -> Message -> STM Bool
 validateMessage server (Message user_ payload_ game_) = do
   games <- readTVar (view games server)
@@ -55,27 +59,29 @@ validateMessage server (Message user_ payload_ game_) = do
 validateOrders :: Player -> Game -> Orders -> Bool
 validateOrders player game (Orders commands) = validateCommands player commands game
 
+-- | Processing messages
+
+readMessage :: Server -> STM Message
+readMessage server = readTChan (view input server)
+
 -- uuuugh
 processMessage :: Server -> IO ()
 processMessage server = atomically $ do
-  message <- readTChan (view input server)
+  message@(Message user_ payload_ game_) <- readMessage server
   gomes :: Map Int (Map User Player, Game) <- readTVar (view games server)
   isValid <- validateMessage server message
   when isValid $
-    let gs' :: Maybe (Map Int (Map User Player, Game)) = do
-          (players, gm) <- Map.lookup (view game message) gomes
-          player <- Map.lookup (view user message) players
-          game' <- fmap (stepGame 0) $ processMessagePayload
-                     player
-                     (view payload message)
-                     gm
-          let games' :: Map Int (Map User Player, Game) = Map.insert (view game message) (players, game') gomes
+    let mgs :: Maybe (Map Int (Map User Player, Game)) = do
+          (players, gm) <- Map.lookup game_ gomes
+          player <- Map.lookup user_ players
+          game' <- fmap (stepGame 0) $
+                     processMessagePayload player payload_ gm
+          let games' = Map.insert game_ (players, game') gomes
           return games'
     in
-    maybe
-      (return ())
-      (\gs -> writeTVar (view games server) gs)
-      gs'
+    case mgs of
+      Nothing           -> return ()
+      Just updatedGames -> writeTVar (view games server) updatedGames
 
 processMessagePayload :: Player -> MessagePayload -> Game -> Maybe Game
 processMessagePayload player payload game =

@@ -50,8 +50,10 @@ data TargetType = TTSelf | TTFriend | TTFoe | TTAny
 -- data Effect = Effect            -- jinkies
 --   deriving (Show)
 
-data Effect = Effect (CharacterState -> CharacterState)
-
+data Effect -- = Effect (CharacterState -> CharacterState)
+  = Damage Damage
+  | Healing Damage
+  | Status StatusState
 instance Show Effect where
   show e = "Effect"
 
@@ -73,7 +75,39 @@ data CharacterState = CharacterState -- I expect to eventually track damage diff
   { _characterStateCharacter :: Character
   , _characterStateDamage    :: Damage
   , _characterStateOwner     :: Player
+  , _characterStateBuffs     :: [StatusState]
   } deriving (Show)
+
+type TurnNumber = Int
+
+type Duration = Int
+
+data Status
+  = ExtraDamage Damage
+  | ReducedDamage Damage
+  | TemporaryHealth Int
+  | TemporaryEnergy Int -- ugh this is dumb
+  | Blocked
+  | Poisoned Damage
+  | RedirectingDamageTo Int -- character id
+  | Dodging
+  | DamageReduction Damage
+  deriving Show
+
+type AbilityId = Int
+type CharacterId = Int
+
+data StatusState = StatusState
+  { _statusStateStatus   :: Status
+  , _statusStateDuration :: Duration
+  , _statusStateSource   :: Source
+  } deriving Show
+
+data Source = Source -- so many Ints, wtf
+  { _sourceCharacter :: CharacterId
+  , _sourceAbility   :: AbilityId
+  , _sourceTurn      :: TurnNumber
+  } deriving Show
 
 data Player = FirstPlayer | SecondPlayer
   deriving (Ord, Eq, Show)
@@ -82,7 +116,7 @@ data Command = Command
   { _commandCharacter :: Int -- for now...
   , _commandAbility   :: Int -- yuck...
   , _commandTarget    :: Int -- okay this is just a placeholder
-  } deriving Show -- jeez
+  } deriving Show
 
 type TimeDelta = Int
 

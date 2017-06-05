@@ -121,7 +121,7 @@ isDefeated :: Player -> Game -> Bool
 isDefeated player game = not $ any isAlive (playerChars player game)
 
 new :: Player -> Character -> CharacterState
-new player char = CharacterState char mempty player
+new player char = CharacterState char mempty player []
 
 applyDamage :: Damage -> Stats -> Stats
 applyDamage d s = s & health -~ (view health d)
@@ -139,14 +139,19 @@ payFor :: Ability -> CharacterState -> CharacterState
 payFor ability = payCost (view cost ability)
 
 damageEff :: Damage -> Effect
-damageEff d = Effect $ \h -> h & damage . health +~ view health d
-                               & damage . energy +~ view energy d
+damageEff d = Damage d
 
 healingEff :: Damage -> Effect
-healingEff d = Effect $ \h -> h & damage . health -~ view health d
-                                & damage . energy -~ view energy d
+healingEff d = Healing d
 
 applyAbility :: Ability -> CharacterState -> CharacterState
-applyAbility ability = f
-  where
-    Effect f = view effect ability
+applyAbility ability char = case view effect ability of
+  Damage d -> applyDamageEffect d char
+  Status s -> applyStatusEffect s char
+
+applyDamageEffect :: Damage -> CharacterState -> CharacterState
+applyDamageEffect (Stats h e) char = char & damage . health +~ h
+                                           & damage . energy +~ e
+
+applyStatusEffect :: StatusState -> CharacterState -> CharacterState
+applyStatusEffect status char = char & buffs %~ cons status

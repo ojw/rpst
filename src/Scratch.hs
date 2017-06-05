@@ -37,8 +37,6 @@ players = Map.fromList [("James", FirstPlayer), ("Clayton", SecondPlayer)]
 gom :: Game
 gom = newGame def [stabber] [puncher]
 
---Game $ Map.fromList [(1, new puncher FirstPlayer), (2, new stabber SecondPlayer)]
-
 command1 :: Command
 command1 = Command 1 0 2
 
@@ -46,7 +44,7 @@ command2 :: Command
 command2 = Command 2 0 1
 
 message1 = Message "James" (CharacterOrders (Orders [command1])) 0
-message2 = Message "Clayton" (CharacterOrders (Orders [])) 0
+message2 = Message "Clayton" (CharacterOrders (Orders [command2])) 0
 
 test1 = do
   server <- makeServer
