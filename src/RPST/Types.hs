@@ -28,6 +28,9 @@ instance Monoid (Stats' a) where
   mempty = Stats 0 0
   (Stats a b) `mappend` (Stats x y) = Stats (a+x) (b+y)
 
+reverseStats :: Stats' a -> Stats' a
+reverseStats (Stats h e) = Stats (negate h) (negate e)
+
 data CostStats
 data DamageStats
 data CharacterStats
@@ -53,7 +56,9 @@ data TargetType = TTSelf | TTFriend | TTFoe | TTAny
 data Effect -- = Effect (CharacterState -> CharacterState)
   = Damage Damage
   | Healing Damage
-  | Status StatusState
+  | Status StatusState -- shouldn't be StatusState, but something in
+                       -- between since tracking source here is wrong
+
 instance Show Effect where
   show e = "Effect"
 
@@ -75,7 +80,7 @@ data CharacterState = CharacterState -- I expect to eventually track damage diff
   { _characterStateCharacter :: Character
   , _characterStateDamage    :: Damage
   , _characterStateOwner     :: Player
-  , _characterStateBuffs     :: [StatusState]
+  , _characterStateStatuses  :: [StatusState]
   } deriving (Show)
 
 type TurnNumber = Int
@@ -188,3 +193,4 @@ makeFields ''Server
 makeFields ''Message
 makeFields ''Orders
 makeFields ''GameConfig
+makeFields ''StatusState

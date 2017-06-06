@@ -7,6 +7,7 @@ import           Control.Monad (join)
 import           Data.Map      (Map)
 import qualified Data.Map      as Map
 import qualified Data.Maybe    as Maybe
+import           Data.Monoid   ((<>))
 import           Debug.Trace
 import           RPST.Types
 
@@ -42,6 +43,7 @@ runTurn :: Game -> Game
 runTurn game = game'' & firstPlayerOrders .~ Nothing
                       & secondPlayerOrders .~ Nothing
                       & timer .~ view (config . timePerTurn) game
+                      & characters . traversed %~ tickCharacter
   where
     commands1 = maybe [] id (preview (firstPlayerOrders . _Just . orders) game)
     commands2 = maybe [] id (preview (secondPlayerOrders . _Just . orders) game)
@@ -89,7 +91,7 @@ processCommands commands game = foldr update (Just game) commands
 processCommand :: Command -> Game -> Maybe Game
 processCommand command game = do
   (char,  abty, tgt) <- commandContents command game
-  return $ game & characters . ix (view target command) %~ applyAbility abty
+  return $ game & characters . ix (view target command) %~ applyAbility char abty
                 & characters . ix (view character command) %~ payCost (view cost abty)
 
 viewCharacter :: CharacterState -> Character -- ??? Eventually won't be Character... this is just for debugging or something
@@ -144,14 +146,25 @@ damageEff d = Damage d
 healingEff :: Damage -> Effect
 healingEff d = Healing d
 
-applyAbility :: Ability -> CharacterState -> CharacterState
-applyAbility ability char = case view effect ability of
-  Damage d -> applyDamageEffect d char
-  Status s -> applyStatusEffect s char
+applyAbility :: CharacterState -> Ability -> CharacterState -> CharacterState
+applyAbility source ability target = case view effect ability of
+  Damage d -> applyDamageEffect (buffedDamage source d) target
+  Status s -> applyStatusEffect s target
 
 applyDamageEffect :: Damage -> CharacterState -> CharacterState
 applyDamageEffect (Stats h e) char = char & damage . health +~ h
                                            & damage . energy +~ e
 
 applyStatusEffect :: StatusState -> CharacterState -> CharacterState
-applyStatusEffect status char = char & buffs %~ cons status
+applyStatusEffect status char = char & statuses %~ cons status
+
+buffedDamage :: CharacterState -> Damage -> Damage
+buffedDamage state d = foldr buffDamage d (state ^.. statuses . traversed . status)
+
+buffDamage :: Status -> Damage -> Damage
+buffDamage (ExtraDamage e) d   = e <> d
+buffDamage (ReducedDamage r) d = (reverseStats r) <> d
+buffDamage _ d                 = d
+
+tickCharacter :: CharacterState -> CharacterState
+tickCharacter = statuses . traversed . duration -~ 1
