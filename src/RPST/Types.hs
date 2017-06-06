@@ -39,19 +39,8 @@ type Stats = Stats' CharacterStats
 type Cost = Stats' CostStats
 type Damage = Stats' DamageStats
 
--- instance Num Damage where
---   (Damage s) + (Damage s') = Damage (s + s')
---   (Damage s) * (Damage s') = Damage (s * s')
---   abs (Damage d) = Damage (abs d)
---   signum (Damage d) = Damage (signum d)
---   fromInteger i = Damage (fromInteger i)
---   negate (Damage d) = Damage (negate d)
-
 data TargetType = TTSelf | TTFriend | TTFoe | TTAny
   deriving (Show)
-
--- data Effect = Effect            -- jinkies
---   deriving (Show)
 
 data Effect -- = Effect (CharacterState -> CharacterState)
   = Damage Damage
