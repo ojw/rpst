@@ -91,18 +91,20 @@ processCommands commands game = foldr update (Just game) commands
 processCommand :: Command -> Game -> Maybe Game
 processCommand command game = do
   (char,  abty, tgt) <- commandContents command game
-  return $ game & characters . ix (view target command) %~ applyAbility char abty
-                & characters . ix (view character command) %~ payCost (view cost abty)
+  if isAlive char && isAlive tgt
+    then return $ game & characters . ix (view target command) %~ applyAbility char abty
+                       & characters . ix (view character command) %~ payCost (view cost abty)
+    else return game
 
 viewCharacter :: CharacterState -> Character -- ??? Eventually won't be Character... this is just for debugging or something
 viewCharacter cs = view character cs & stats %~ applyDamage (view damage cs)
 
 isAlive :: CharacterState -> Bool
-isAlive char = maxHealth > healthDamage
+isAlive char = maxHealth > currentDamage
   where
     maxHealth = view (character . stats . health) char
-    d = view damage char -- ugh what was I thinking
-    healthDamage = view health d
+    currentDamage = view (damage . health) char -- ugh what was I thinking
+
 
 outcome :: Game -> Outcome
 outcome game
@@ -128,6 +130,9 @@ new player char = CharacterState char mempty player []
 applyDamage :: Damage -> Stats -> Stats
 applyDamage d s = s & health -~ (view health d)
                     & energy -~ (view energy d)
+
+currentStats :: CharacterState -> Stats
+currentStats state = applyDamage (view damage state) (view (character . stats) state)
 
 -- jeez which of these do I want?
 payCost :: Cost -> CharacterState -> CharacterState
