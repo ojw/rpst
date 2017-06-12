@@ -9,6 +9,7 @@ import qualified Data.Map      as Map
 import qualified Data.Maybe    as Maybe
 import           Data.Monoid   ((<>))
 import           Debug.Trace
+import           RPST.Lenses
 import           RPST.Types
 
 -- | Create a new game.
@@ -59,19 +60,19 @@ runTurn game = game'' & firstPlayerOrders .~ Nothing
 -- There's gotta be a better way of doing this kinda thing.
 -- Like parameterizing by a functor or something, idk.
 
-commandContents :: Command -> Game -> Maybe (CharacterState, Ability, CharacterState)
+commandContents :: Command -> Game -> Maybe AbilityApplication
 commandContents com gom = do
   char <- Map.lookup (view character com) (view characters gom)
   abil <- char ^? character . abilities . ix (view ability com)
   targ <- Map.lookup (view target com) (view characters gom)
-  return (char, abil, targ)
+  return (AbilityApplication abil char targ)
 
 -- | The command's source, target, and ability all exist, and the player controls the source character.
 
 validateCommand :: Player -> Game -> Command -> Bool
 validateCommand player game command = case commandContents command game of
-  Nothing                 -> False
-  Just (char, abil, targ) -> player == view owner char
+  Nothing                                  -> False
+  Just (AbilityApplication abil char targ) -> player == view owner char
 
 validateCommands :: Player -> [Command] -> Game -> Bool
 validateCommands player commands game = all (validateCommand player game)commands
@@ -90,9 +91,9 @@ processCommands commands game = foldr update (Just game) commands
 -- this needs way more intelligence around it
 processCommand :: Command -> Game -> Maybe Game
 processCommand command game = do
-  (char,  abty, tgt) <- commandContents command game
+  AbilityApplication  abty char tgt <- commandContents command game
   if isAlive char && isAlive tgt
-    then return $ game & characters . ix (view target command) %~ applyAbility char abty
+    then return $ game & characters . ix (view target command) %~ applyAbility . AbilityApplication abty char
                        & characters . ix (view character command) %~ payCost (view cost abty)
     else return game
 
@@ -151,10 +152,16 @@ damageEff d = Damage d
 healingEff :: Damage -> Effect
 healingEff d = Healing d
 
-applyAbility :: CharacterState -> Ability -> CharacterState -> CharacterState
-applyAbility source ability target = case view effect ability of
-  Damage d -> applyDamageEffect (buffedDamage source d) target
-  Status s -> applyStatusEffect s target
+applicationEffect :: AbilityApplication -> Effect
+applicationEffect application = case view (ability . effect) application of
+  Damage d -> Damage (buffedDamage (view source application) d)
+  Status s -> Status s
+
+applyAbility :: AbilityApplication -> CharacterState
+applyAbility (AbilityApplication ability source target) =
+  case view effect ability of
+    Damage d -> applyDamageEffect (buffedDamage source d) target
+    Status s -> applyStatusEffect s target
 
 applyDamageEffect :: Damage -> CharacterState -> CharacterState
 applyDamageEffect (Stats h e) char = char & damage . health +~ h
@@ -173,3 +180,13 @@ buffDamage _ d                 = d
 
 tickCharacter :: CharacterState -> CharacterState
 tickCharacter = statuses . traversed . duration -~ 1
+
+groupBy :: (Foldable t, Ord b) => (a -> b) -> t a -> Map b [a]
+groupBy f = foldr (\x -> Map.insertWith (++) (f x) [x]) Map.empty
+
+-- convert chosen abilities to a priority map
+-- execute in order
+
+-- not the actual thing we want yet
+foo :: [Ability] -> Map Int [Ability]
+foo = groupBy (view priority)

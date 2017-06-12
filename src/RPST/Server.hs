@@ -14,6 +14,7 @@ import           Data.Monoid            ((<>))
 import           Data.Text              (Text)
 
 import           RPST.Game
+import           RPST.Lenses
 import           RPST.Types
 
 -- | Creating games and servers

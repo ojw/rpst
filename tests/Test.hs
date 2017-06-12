@@ -1,7 +1,8 @@
 {-# LANGUAGE OverloadedStrings #-}
--- | Like an emacs scratch buffer, for a haskell project
 
-module Scratch where
+-- | Some tests...
+
+module Test where
 
 import           Control.Lens
 import           Data.Default
@@ -9,11 +10,12 @@ import           Data.Map     (Map)
 import qualified Data.Map     as Map
 
 import           RPST.Game
+import           RPST.Lenses
 import           RPST.Server
 import           RPST.Types
 
 punch :: Ability
-punch = Ability "Punch" (Stats 0 1) TTFoe (damageEff (Stats 2 0))
+punch = Ability "Punch" (Stats 0 1) TTFoe (damageEff (Stats 2 0)) 50
 
 puncher :: Character
 puncher = Character
@@ -24,7 +26,7 @@ puncher = Character
   }
 
 stab :: Ability
-stab = Ability "Stab" (Stats 0 1) TTFoe (damageEff (Stats 4 0))
+stab = Ability "Stab" (Stats 0 1) TTFoe (damageEff (Stats 4 0)) 60
 
 stabber :: Character
 stabber = puncher
@@ -32,7 +34,7 @@ stabber = puncher
   & abilities .~ [stab]
 
 enrage :: Ability
-enrage = Ability "Enrage" (Stats 0 3) TTFriend (Status (StatusState (ExtraDamage (Stats 3 0)) 3 (Source 0 0 0))) -- ugh the source is so fake
+enrage = Ability "Enrage" (Stats 0 3) TTFriend (Status (StatusState (ExtraDamage (Stats 3 0)) 3)) 20 -- ugh the source is so fake
 
 rageMage :: Character
 rageMage = Character

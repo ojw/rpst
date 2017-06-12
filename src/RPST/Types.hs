@@ -1,11 +1,3 @@
-{-# LANGUAGE DeriveAnyClass         #-}
-{-# LANGUAGE FlexibleContexts       #-}
-{-# LANGUAGE FlexibleInstances      #-}
-{-# LANGUAGE FunctionalDependencies #-}
-{-# LANGUAGE MultiParamTypeClasses  #-}
-{-# LANGUAGE ScopedTypeVariables    #-}
-{-# LANGUAGE TemplateHaskell        #-}
-
 module RPST.Types where
 
 import           Control.Concurrent.STM
@@ -48,6 +40,25 @@ data Effect -- = Effect (CharacterState -> CharacterState)
   | Status StatusState -- shouldn't be StatusState, but something in
                        -- between since tracking source here is wrong
 
+-- hmm...
+-- Or does Effect also take into account target defenses, etc?
+-- data AppliedEffect
+--   = AppliedDamage Damage
+--   | AppliedHealing Damage
+--   | AppliedStatus Status
+
+-- So we'll have an event type, they'll get logged / rendered ...now
+-- how do we log these events?  ...a writer / logger somewhere in the
+-- stack?  ... actually the game monad should provide a logEvent or
+-- similar, imo ... but mmaybe the free style handles logging better?
+-- idk, this is logging I intend to display, which feels more semantic
+data Event
+  = AbilityApplied AbilityApplication
+  | EffectGenerated Effect -- the effect as the source intended
+  | EffectApplied Effect -- the effect as it impacts the target,
+                         -- applying resistances, etc
+  | CharacterStateChanged -- like death / incapacitation?
+
 instance Show Effect where
   show e = "Effect"
 
@@ -56,6 +67,16 @@ data Ability = Ability
   , _abilityCost       :: Cost
   , _abilityTargetType :: TargetType
   , _abilityEffect     :: Effect
+  , _abilityPriority   :: Int -- proper type eventually
+  } deriving (Show)
+
+data Target = Target -- uuuuugh have to match this with TargetType somehow
+  deriving Show
+
+data AbilityApplication = AbilityApplication
+  { _abilityApplicationAbility :: Ability
+  , _abilityApplicationSource  :: CharacterState
+  , _abilityApplicationTarget  :: CharacterState -- ugh, wrong
   } deriving (Show)
 
 data Character = Character
@@ -94,7 +115,6 @@ type CharacterId = Int
 data StatusState = StatusState
   { _statusStateStatus   :: Status
   , _statusStateDuration :: Duration
-  , _statusStateSource   :: Source
   } deriving Show
 
 data Source = Source -- so many Ints, wtf
@@ -168,18 +188,3 @@ data Error
   | UserDoesNotControlCharacter
   | CharacterIsNotInGame
   | CharacterDoesNotHaveAbility
-
--- gotta have soooomething here... not sure what yet
-type Foo = ExceptT Error STM
-
-makeFields ''Stats'
-makeFields ''Character
-makeFields ''Ability
-makeFields ''CharacterState
-makeFields ''Command
-makeFields ''Game
-makeFields ''Server
-makeFields ''Message
-makeFields ''Orders
-makeFields ''GameConfig
-makeFields ''StatusState
