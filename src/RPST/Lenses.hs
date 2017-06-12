@@ -21,5 +21,5 @@ makeFields ''Server
 makeFields ''Message
 makeFields ''Orders
 makeFields ''GameConfig
-makeFields ''StatusState
+makeFields ''StatusEffect
 makeFields ''AbilityApplication

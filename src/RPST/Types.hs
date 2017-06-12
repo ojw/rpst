@@ -37,8 +37,8 @@ data TargetType = TTSelf | TTFriend | TTFoe | TTAny
 data Effect -- = Effect (CharacterState -> CharacterState)
   = Damage Damage
   | Healing Damage
-  | Status StatusState -- shouldn't be StatusState, but something in
-                       -- between since tracking source here is wrong
+  | Status StatusEffect -- shouldn't be StatusState, but something in
+                        -- between since tracking source here is wrong
 
 -- hmm...
 -- Or does Effect also take into account target defenses, etc?
@@ -52,6 +52,10 @@ data Effect -- = Effect (CharacterState -> CharacterState)
 -- stack?  ... actually the game monad should provide a logEvent or
 -- similar, imo ... but mmaybe the free style handles logging better?
 -- idk, this is logging I intend to display, which feels more semantic
+
+-- I think all Events will wind up including sources, targets, etc...
+-- not sure how this relates to fields in AbilityApplication
+-- Probably want a type wrapping source, target, effect
 data Event
   = AbilityApplied AbilityApplication
   | EffectGenerated Effect -- the effect as the source intended
@@ -90,7 +94,7 @@ data CharacterState = CharacterState -- I expect to eventually track damage diff
   { _characterStateCharacter :: Character
   , _characterStateDamage    :: Damage
   , _characterStateOwner     :: Player
-  , _characterStateStatuses  :: [StatusState]
+  , _characterStateStatuses  :: [StatusEffect]
   } deriving (Show)
 
 type TurnNumber = Int
@@ -112,10 +116,14 @@ data Status
 type AbilityId = Int
 type CharacterId = Int
 
-data StatusState = StatusState
-  { _statusStateStatus   :: Status
-  , _statusStateDuration :: Duration
+data StatusEffect = StatusEffect
+  { _statusEffectStatus   :: Status
+  , _statusEffectDuration :: Duration
   } deriving Show
+
+-- probably gonna want this later
+data StatusApplication = StatusApplication
+  deriving Show
 
 data Source = Source -- so many Ints, wtf
   { _sourceCharacter :: CharacterId

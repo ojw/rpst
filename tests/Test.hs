@@ -34,7 +34,7 @@ stabber = puncher
   & abilities .~ [stab]
 
 enrage :: Ability
-enrage = Ability "Enrage" (Stats 0 3) TTFriend (Status (StatusState (ExtraDamage (Stats 3 0)) 3)) 20 -- ugh the source is so fake
+enrage = Ability "Enrage" (Stats 0 3) TTFriend (Status (StatusEffect (ExtraDamage (Stats 3 0)) 3)) 20 -- ugh the source is so fake
 
 rageMage :: Character
 rageMage = Character

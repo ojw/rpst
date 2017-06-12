@@ -167,7 +167,7 @@ applyDamageEffect :: Damage -> CharacterState -> CharacterState
 applyDamageEffect (Stats h e) char = char & damage . health +~ h
                                            & damage . energy +~ e
 
-applyStatusEffect :: StatusState -> CharacterState -> CharacterState
+applyStatusEffect :: StatusEffect -> CharacterState -> CharacterState
 applyStatusEffect status char = char & statuses %~ cons status
 
 buffedDamage :: CharacterState -> Damage -> Damage
