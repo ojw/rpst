@@ -67,12 +67,14 @@ data Event
 instance Show Effect where
   show e = "Effect"
 
+type Priority = Int
+
 data Ability = Ability
   { _abilityName       :: Text
   , _abilityCost       :: Cost
   , _abilityTargetType :: TargetType
   , _abilityEffect     :: Effect
-  , _abilityPriority   :: Int -- proper type eventually
+  , _abilityPriority   :: Priority -- proper type eventually
   } deriving (Show)
 
 data Target = Target -- uuuuugh have to match this with TargetType somehow
@@ -83,7 +85,8 @@ data Target = Target -- uuuuugh have to match this with TargetType somehow
 -- represent ability as used by source (buffed damage, etc)
 -- represent ability as received by target (damage reduction, etc)
 data AbilityApplication = AbilityApplication
-  { _abilityApplicationAbility :: Ability
+  { _abilityApplicationCommand :: Command -- this is just to keep the IDs, ugh, what pain
+  , _abilityApplicationAbility :: Ability
   , _abilityApplicationSource  :: CharacterState
   , _abilityApplicationTarget  :: CharacterState -- ugh, wrong
   } deriving (Show)

@@ -28,6 +28,20 @@ class (Monad m, MonadError GameError m) => MonadGame m where
   logEvent :: Event -> m ()
   getCharacters :: m [CharacterId] -- maybe
 
+  -- payCost :: Cost -> CharacterId -> m ()
+  -- applyAbility :: AbilityApplication -> m ()
+  -- commandAbility :: Command -> m AbilityApplication
+
+  processCommand :: Command -> m () -- or provide primitives instead
+
+-- ugh, problems around sometimes needing IDs, sometimes full values :/
+-- processCommand :: Command -> m ()
+-- processCommand command = do
+--   application@(AbilityApplication ability source target) <- commandAbility command
+--   payCost source (view cost ability) -- gotta handle potential cost reduction
+--   applyAbility application
+
+
 getCommands :: MonadGame m => m ([Command], [Command])
 getCommands = do
   (morder1, morder2) <- playerOrders
@@ -55,6 +69,7 @@ stepGame elapsedTime = do
 runTurn :: MonadGame m => m ()
 runTurn = do
   (commands, commands2) <- getCommands
---   mapM_
+  mapM_ processCommand (commands ++ commands2)
   resetOrders
+  resetTimer
   return ()
