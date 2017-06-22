@@ -4,6 +4,7 @@ import           Control.Concurrent.STM
 import           Control.Error
 import           Control.Lens
 import           Data.Default
+import           Data.Group             (Group (..))
 import           Data.Map               (Map)
 import qualified Data.Map               as Map
 import           Data.Text              (Text)
@@ -20,8 +21,8 @@ instance Monoid (Stats' a) where
   mempty = Stats 0 0
   (Stats a b) `mappend` (Stats x y) = Stats (a+x) (b+y)
 
-reverseStats :: Stats' a -> Stats' a
-reverseStats (Stats h e) = Stats (negate h) (negate e)
+instance Group (Stats' a) where
+  invert (Stats h e) = Stats (negate h) (negate e)
 
 data CostStats
 data DamageStats

@@ -4,6 +4,7 @@ module RPST.Game where
 
 import           Control.Lens
 import           Control.Monad (join)
+import           Data.Group    (invert)
 import           Data.Map      (Map)
 import qualified Data.Map      as Map
 import qualified Data.Maybe    as Maybe
@@ -175,7 +176,7 @@ buffedDamage state d = foldr buffDamage d (state ^.. statuses . traversed . stat
 
 buffDamage :: Status -> Damage -> Damage
 buffDamage (ExtraDamage e) d   = e <> d
-buffDamage (ReducedDamage r) d = (reverseStats r) <> d
+buffDamage (ReducedDamage r) d = invert r <> d
 buffDamage _ d                 = d
 
 tickCharacter :: CharacterState -> CharacterState

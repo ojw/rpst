@@ -29,6 +29,7 @@ executable rpst
                      , present
                      , stm
                      , text
+                     , groups
   hs-source-dirs:      src
   default-language:    Haskell2010
   -- default-extensions:  TemplateHaskell
