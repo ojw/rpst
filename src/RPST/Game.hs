@@ -97,20 +97,12 @@ validateCommand player game command = case commandApplication game command of
 validateCommands :: Player -> [Command] -> Game -> Bool
 validateCommands player commands game = all (validateCommand player game)commands
 
--- | Run a list of commands on a game.
--- If any commands return Left, returns Left.
--- Otherwise returns Right with a new game state.
-
-processApplications :: [AbilityApplication] -> Game -> Either GameError Game
-processApplications applications game = foldr update (pure game) applications
-  where
-    update application eitherGame = processApplication application =<< eitherGame
-
-
+processApplications :: Game -> [AbilityApplication] -> Either GameError Game
+processApplications game applications = foldM processApplication game applications
 
 -- this needs way more intelligence around it
-processApplication :: AbilityApplication -> Game -> Either GameError Game
-processApplication (AbilityApplication cmd abty char tgt) game = do
+processApplication :: Game -> AbilityApplication -> Either GameError Game
+processApplication game (AbilityApplication cmd abty char tgt) = do
   if isAlive char && isAlive tgt
     then return $ game & characters . ix (view target cmd) %~ applyAbility . AbilityApplication cmd abty char
                        & characters . ix (view character cmd) %~ payCost (view cost abty)
@@ -120,7 +112,7 @@ processApplication (AbilityApplication cmd abty char tgt) game = do
 processCommands :: Game -> [Command] -> Either GameError Game
 processCommands gom commands = do
   applications <- commandApplications commands gom
-  processApplications applications gom
+  processApplications gom applications
 
 viewCharacter :: CharacterState -> Character -- ??? Eventually won't be Character... this is just for debugging or something
 viewCharacter cs = view character cs & stats %~ applyDamage (view damage cs)
@@ -130,7 +122,6 @@ isAlive char = maxHealth > currentDamage
   where
     maxHealth = view (character . stats . health) char
     currentDamage = view (damage . health) char -- ugh what was I thinking
-
 
 outcome :: Game -> Outcome
 outcome game
@@ -190,7 +181,7 @@ applyAbility (AbilityApplication _ ability source target) =
 
 applyDamageEffect :: Damage -> CharacterState -> CharacterState
 applyDamageEffect (Stats h e) char = char & damage . health +~ h
-                                           & damage . energy +~ e
+                                          & damage . energy +~ e
 
 applyStatusEffect :: StatusEffect -> CharacterState -> CharacterState
 applyStatusEffect status char = char & statuses %~ cons status

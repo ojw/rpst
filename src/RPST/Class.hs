@@ -12,12 +12,15 @@ import           RPST.Lenses
 import           RPST.Types
 import           Control.Monad.Except
 
+-- setOrders, stepGame are the interface used by the server
+
 -- tbh I don't know what even goes here
 -- I think this is the low-level game stuff only
 -- I think I wanna implement processing a turn using these primitives
 class (Monad m, MonadError GameError m) => MonadGame m where
   lookupCharacter :: CharacterId -> m Character
   lookupAbility :: CharacterId -> AbilityId -> m Ability
+
   setOrders :: Player -> Orders -> m ()
   resetOrders :: m () -- I think this is only done for both at once
   stepTime :: TimeDelta -> m ()
@@ -32,15 +35,20 @@ class (Monad m, MonadError GameError m) => MonadGame m where
   -- applyAbility :: AbilityApplication -> m ()
   -- commandAbility :: Command -> m AbilityApplication
 
-  processCommand :: Command -> m () -- or provide primitives instead
+  -- could be computed from playerOrders
+  orderedCommands :: m [(Priority, [Command])]
+  commandApplication :: Command -> m AbilityApplication
+  processApplication :: AbilityApplication -> m ()
 
--- ugh, problems around sometimes needing IDs, sometimes full values :/
--- processCommand :: Command -> m ()
--- processCommand command = do
---   application@(AbilityApplication ability source target) <- commandAbility command
---   payCost source (view cost ability) -- gotta handle potential cost reduction
---   applyAbility application
+processCommandGroup :: MonadGame m => [Command] -> m ()
+processCommandGroup commands = do
+  applications <- mapM commandApplication commands
+  mapM_ processApplication applications
 
+processCommands :: MonadGame m => m ()
+processCommands = do
+  commands <- orderedCommands
+  mapM_ processCommandGroup (map snd commands)
 
 getCommands :: MonadGame m => m ([Command], [Command])
 getCommands = do
@@ -61,6 +69,11 @@ timeUp = do
     Nothing   -> return False
     Just time -> return (time >= 0)
 
+tickCharacters :: MonadGame m => m ()
+tickCharacters = do
+  characters <- getCharacters
+  mapM_ tickCharacter characters
+
 stepGame :: MonadGame m => TimeDelta -> m ()
 stepGame elapsedTime = do
   run <- liftA2 (||) ordersIn timeUp
@@ -68,8 +81,8 @@ stepGame elapsedTime = do
 
 runTurn :: MonadGame m => m ()
 runTurn = do
-  (commands, commands2) <- getCommands
-  mapM_ processCommand (commands ++ commands2)
+  processCommands
   resetOrders
   resetTimer
+  tickCharacters
   return ()
