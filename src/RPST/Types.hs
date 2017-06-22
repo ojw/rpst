@@ -77,6 +77,10 @@ data Ability = Ability
 data Target = Target -- uuuuugh have to match this with TargetType somehow
   deriving Show
 
+-- threeish uses
+-- represent ability as written
+-- represent ability as used by source (buffed damage, etc)
+-- represent ability as received by target (damage reduction, etc)
 data AbilityApplication = AbilityApplication
   { _abilityApplicationAbility :: Ability
   , _abilityApplicationSource  :: CharacterState
@@ -140,6 +144,7 @@ data Command = Command
   , _commandTarget    :: Int -- okay this is just a placeholder
   } deriving Show
 
+type Time = Int
 type TimeDelta = Int
 
 data GameConfig = GameConfig
@@ -190,9 +195,12 @@ data Message = Message
 data Outcome = WinnerIs Player | MutualDeath | Ongoing
   deriving Show
 
-data Error
+data GameError
+  = CharacterDoesNotExist CharacterId
+  | CharacterDoesNotHaveAbility CharacterId AbilityId
+  | UserDoesNotControlCharacter Player CharacterId
+
+data ServerError
   = GameDoesNotExist
   | UserIsNotInGame
-  | UserDoesNotControlCharacter
-  | CharacterIsNotInGame
-  | CharacterDoesNotHaveAbility
+  | GameError
