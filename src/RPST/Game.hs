@@ -31,6 +31,11 @@ newGame config p1Chars p2Chars = Game chars Nothing Nothing config time
 -- If both players' orders are in, run the commands.
 -- Otherwise, just tick the timer.
 
+-- | A view of a game, suitable for clients.
+
+viewGame :: Game -> GameView
+viewGame game = GameView (view characters game) (view config game)
+
 stepGame :: TimeDelta -> Game -> Game
 stepGame elapsedTime game = if ordersIn || timeUp then runTurn game else tickTimer elapsedTime game
   where

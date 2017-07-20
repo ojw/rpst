@@ -1,18 +1,27 @@
+{-# LANGUAGE DeriveGeneric     #-}
+{-# LANGUAGE OverloadedStrings #-}
+
 module RPST.Types where
 
 import           Control.Concurrent.STM
 import           Control.Error
 import           Control.Lens
+import           Data.Aeson
 import           Data.Default
 import           Data.Group             (Group (..))
 import           Data.Map               (Map)
 import qualified Data.Map               as Map
+import           Data.Maybe             (isJust)
 import           Data.Text              (Text)
+import           GHC.Generics
 
 data Stats' a = Stats
   { _stats'Health :: Int
   , _stats'Energy :: Int
-  } deriving (Show)
+  } deriving (Show, Generic)
+
+instance ToJSON (Stats' a)
+instance FromJSON (Stats' a)
 
 coerceStats :: Stats' a -> Stats' b
 coerceStats (Stats x y) = Stats x y
@@ -24,22 +33,40 @@ instance Monoid (Stats' a) where
 instance Group (Stats' a) where
   invert (Stats h e) = Stats (negate h) (negate e)
 
-data CostStats
-data DamageStats
-data CharacterStats
+data StatsCost
+data StatsDamage
+data StatsCharacter
 
-type Stats = Stats' CharacterStats
-type Cost = Stats' CostStats
-type Damage = Stats' DamageStats
+type Stats = Stats' StatsCharacter
+type Cost = Stats' StatsCost
+type Damage = Stats' StatsDamage
 
-data TargetType = TTSelf | TTFriend | TTFoe | TTAny
-  deriving (Show)
+data TargetType = Self | Friend | Foe | Any
+  deriving (Show, Generic)
+
+instance ToJSON TargetType
+instance FromJSON TargetType
 
 data Effect -- = Effect (CharacterState -> CharacterState)
   = Damage Damage
   | Healing Damage
   | Status StatusEffect -- shouldn't be StatusState, but something in
                         -- between since tracking source here is wrong
+  | Multi [Effect] -- maybe
+  deriving (Generic)
+
+instance ToJSON Effect
+instance FromJSON Effect
+
+-- instance FromJSON Effect where
+--   parseJSON = --withObject "Effect" $ \v ->
+--     -- do
+--       -- damage <- v .:? "damage"
+--       -- healing <- v .:? "healing"
+--       -- status <- v .:? "status"
+--       -- if isJust damage then return (Damage (Stats' 0 0)) else if isJust healing then return (Healing (Stats' 0 0)) else if isJust status then return (Status Blocked) else
+--     \o -> case o of
+--       Object obj ->
 
 -- hmm...
 -- Or does Effect also take into account target defenses, etc?
@@ -75,10 +102,24 @@ data Ability = Ability
   , _abilityTargetType :: TargetType
   , _abilityEffect     :: Effect
   , _abilityPriority   :: Priority -- proper type eventually
-  } deriving (Show)
+  } deriving (Show, Generic)
+
+instance ToJSON Ability
+instance FromJSON Ability
+
+-- instance FromJSON Ability where
+--   parseJSON = withObject "Ability" $ \v -> Ability
+--     <$> v .: "name"
+--     <*> v .: "cost"
+--     <*> v .: "target"
+--     <*> v .: "effect"
+--     <*> v .: "priority"
+
 
 data Target = Target -- uuuuugh have to match this with TargetType somehow
-  deriving Show
+  deriving (Show, Generic)
+
+
 
 -- threeish uses
 -- represent ability as written
@@ -89,21 +130,31 @@ data AbilityApplication = AbilityApplication
   , _abilityApplicationAbility :: Ability
   , _abilityApplicationSource  :: CharacterState
   , _abilityApplicationTarget  :: CharacterState -- ugh, wrong
-  } deriving (Show)
+  } deriving (Show, Generic)
+
+instance ToJSON AbilityApplication
+instance FromJSON AbilityApplication
 
 data Character = Character
   { _characterName       :: Text
   , _characterStats      :: Stats
   , _characterAbilities  :: [Ability]
   , _characterPointValue :: Int       -- assuming point value system later
-  } deriving (Show)
+  , _characterIntrensics :: [Status]
+  } deriving (Show, Generic)
+
+instance ToJSON Character
+instance FromJSON Character
 
 data CharacterState = CharacterState -- I expect to eventually track damage differently... via a collection of effects with sources, durations, etc
   { _characterStateCharacter :: Character
   , _characterStateDamage    :: Damage
   , _characterStateOwner     :: Player
   , _characterStateStatuses  :: [StatusEffect]
-  } deriving (Show)
+  } deriving (Show, Generic)
+
+instance ToJSON CharacterState
+instance FromJSON CharacterState
 
 type TurnNumber = Int
 
@@ -119,7 +170,10 @@ data Status
   | RedirectingDamageTo Int -- character id
   | Dodging
   | DamageReduction Damage
-  deriving Show
+  deriving (Show, Generic)
+
+instance ToJSON Status
+instance FromJSON Status
 
 type AbilityId = Int
 type CharacterId = Int
@@ -127,33 +181,48 @@ type CharacterId = Int
 data StatusEffect = StatusEffect
   { _statusEffectStatus   :: Status
   , _statusEffectDuration :: Duration
-  } deriving Show
+  } deriving (Show, Generic)
+
+instance ToJSON StatusEffect
+instance FromJSON StatusEffect
 
 -- probably gonna want this later
 data StatusApplication = StatusApplication
-  deriving Show
+  deriving (Show, Generic)
 
 data Source = Source -- so many Ints, wtf
   { _sourceCharacter :: CharacterId
   , _sourceAbility   :: AbilityId
   , _sourceTurn      :: TurnNumber
-  } deriving Show
+  } deriving (Show, Generic)
+
+instance ToJSON Source
+instance FromJSON Source
 
 data Player = FirstPlayer | SecondPlayer
-  deriving (Ord, Eq, Show)
+  deriving (Ord, Eq, Show, Generic)
+
+instance ToJSON Player
+instance FromJSON Player
 
 data Command = Command
   { _commandCharacter :: Int -- for now...
   , _commandAbility   :: Int -- yuck...
   , _commandTarget    :: Int -- okay this is just a placeholder
-  } deriving Show
+  } deriving (Show, Generic)
+
+instance ToJSON Command
+instance FromJSON Command
 
 type Time = Int
 type TimeDelta = Int
 
 data GameConfig = GameConfig
   { _gameConfigTimePerTurn  :: Maybe Int
-  } deriving Show
+  } deriving (Show, Generic)
+
+instance ToJSON GameConfig
+instance FromJSON GameConfig
 
 instance Default GameConfig where
   def = GameConfig Nothing
@@ -164,7 +233,18 @@ data Game = Game
   , _gameSecondPlayerOrders :: Maybe Orders
   , _gameConfig             :: GameConfig
   , _gameTimer              :: Maybe Int -- is the game timed?
-  } deriving Show
+  } deriving (Show, Generic)
+
+instance ToJSON Game
+instance FromJSON Game
+
+data GameView = GameView
+  { _gameViewCharacters :: Map Int CharacterState
+  , _gameViewConfig     :: GameConfig
+  } deriving (Show, Generic)
+
+instance ToJSON GameView
+instance FromJSON GameView
 
 -- Server-related types.
 
@@ -185,26 +265,46 @@ data Server = Server
 -- exhaustive, or defaulting for missed characters.
 data Orders = Orders
   { _ordersOrders :: [Command]
-  } deriving Show
+  } deriving (Show, Generic)
+
+instance ToJSON Orders
+instance FromJSON Orders
 
 data MessagePayload = CharacterOrders Orders
-  deriving Show
+  deriving (Show, Generic)
+
+instance ToJSON MessagePayload
+instance FromJSON MessagePayload
 
 data Message = Message
   { _messageUser    :: User
   , _messagePayload :: MessagePayload
   , _messageGame    :: Int
-  } deriving Show
+  } deriving (Show, Generic)
+
+instance ToJSON Message
+instance FromJSON Message
 
 data Outcome = WinnerIs Player | MutualDeath | Ongoing
-  deriving Show
+  deriving (Show, Generic)
+
+instance ToJSON Outcome
+instance FromJSON Outcome
 
 data GameError
   = CharacterDoesNotExist CharacterId
   | CharacterDoesNotHaveAbility CharacterId AbilityId
   | UserDoesNotControlCharacter Player CharacterId
+  deriving (Show, Generic)
+
+instance ToJSON GameError
+instance FromJSON GameError
 
 data ServerError
   = GameDoesNotExist
   | UserIsNotInGame
   | GameError
+  deriving (Show, Generic)
+
+instance ToJSON ServerError
+instance FromJSON ServerError
